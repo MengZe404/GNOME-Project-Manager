@@ -183,7 +183,7 @@ class MyGPM(object):
         self.connection.commit()
 
     
-    def insertProjectDB(self, uname, name, language, type, audience, feature, detail, url='', date='', repo_id=0, id=0):
+    def insertProjectDB(self, uname, name, language, type, audience, feature, detail, path='', date='', todo='', repo_id=0, id=0):
         if date == '':
             date = datetime.date.today()
 
@@ -200,11 +200,11 @@ class MyGPM(object):
             project_id = id
 
         insert = '''
-            INSERT INTO projects (PROJECT_ID, project_name, project_language, project_type, project_audience, project_feature, project_detail, project_url, project_date, project_status, user_id, repo_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO projects (PROJECT_ID, project_name, project_language, project_type, project_audience, project_feature, project_detail, project_path, project_date, project_status, project_todo, user_id, repo_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         '''
 
-        self.c.execute(insert, (project_id, name, language, type, audience, feature, detail, url, date, 0, user_id, repo_id))
+        self.c.execute(insert, (project_id, name, language, type, audience, feature, detail, path, date, 0, todo, user_id, repo_id))
 
         self.connection.commit()
 
@@ -254,15 +254,19 @@ class MyGPM(object):
         self.c.execute(update, data)
         self.connection.commit()
 
-    def updateProjectData(self, id, name, language, type, audience, feature, detail):
+    def updateProjectData(self, id, name, language, type, audience, feature, detail, path):
         update = '''
         UPDATE projects
-        SET project_name=?, project_language=?, project_type=?, project_audience=?, project_feature=?, project_detail=?
+        SET project_name=?, project_language=?, project_type=?, project_audience=?, project_feature=?, project_detail=?, project_path=?
         WHERE PROJECT_ID=?
         '''
-        data = (name, language, type, audience, feature, detail, id)
+        data = (name, language, type, audience, feature, detail, path, id)
         self.c.execute(update, data)
         self.connection.commit()
+
+    def updateTodo(self, id, todo):
+       self.c.execute("UPDATE PROJECTS SET project_todo=? WHERE PROJECT_ID=?", (todo, id))
+       self.connection.commit()
 
     def refreshData(self, uname):
         self.c.execute('DELETE FROM repos WHERE repos.user_id=(SELECT ID FROM users WHERE github=?)', (uname,))
@@ -296,12 +300,12 @@ class MyGPM(object):
         return data
 
     def getProjectWorking(self, uname):
-        project_working = self.c.execute('SELECT PROJECT_ID, project_name, project_url FROM projects INNER JOIN users ON projects.user_id=users.ID WHERE users.github=? AND projects.project_status=0', (uname,))
+        project_working = self.c.execute('SELECT PROJECT_ID, project_name, project_path FROM projects INNER JOIN users ON projects.user_id=users.ID WHERE users.github=? AND projects.project_status=0', (uname,))
         return project_working
 
     
     def getProjectData(self, id):
-        project =  self.c.execute('SELECT project_name, project_language, project_type, project_audience, project_feature, project_detail, project_url, project_date FROM projects WHERE PROJECT_ID=?', (id,))
+        project =  self.c.execute('SELECT project_name, project_language, project_type, project_audience, project_feature, project_detail, project_path, project_date FROM projects WHERE PROJECT_ID=?', (id,))
         return project
 
 
@@ -317,19 +321,18 @@ class MyGPM(object):
             idea_count = i[0]
         return idea_count
 
+    def getTodo(self, id):
+        todo = self.c.execute('SELECT project_todo FROM projects WHERE PROJECT_ID=?', (id,))
+        for i in todo:
+            todo = i[0]
+        return todo
+
 
     def getRepoStatus(self, id):
         repo_status = self.c.execute("SELECT repo_status FROM repos WHERE REPO_ID=?", (id,))
         for i in repo_status:
             repo_status = i[0]
         return repo_status
-
-    def getProjectStatus(self, id):
-        project_status = self.c.execute("SELECT project_status FROM projects WHERE PROJECT_ID=?", (id,))
-        for i in project_status:
-            project_status = i[0]
-        return project_status
-
 
 #### Login System   
     def varify(self, uname, pword):
@@ -373,7 +376,7 @@ class MyGPM(object):
             repo_data = self.c.execute('SELECT REPO_ID, repo_name, repo_url, created_date, repo_description, repo_language FROM repos WHERE REPO_ID=?', (id,))
             for i in repo_data:
                 data = i
-            self.insertProjectDB(uname, data[1], language=data[5], type='', audience='', feature='', detail=data[4], url=data[2], date=data[3], repo_id=data[0], id=data[0])
+            self.insertProjectDB(uname, data[1], language=data[5], type='', audience='', feature='', detail=data[4], path='', date=data[3], repo_id=data[0], id=data[0])
         if status == 1:
             self.c.execute('DELETE FROM projects WHERE projects.repo_id=?', (id,))
         

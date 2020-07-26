@@ -3,13 +3,14 @@ import password # This provides the functionality to decrypt data from the datab
 
 from sys import argv, exit 
 import subprocess # This provides the functionality to open other softwares
+import os
 
 # Modules for GUI design
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gio, Gdk
 
-# CSS stylesheet
+# CSS styleshee
 CSS = b"""
 .myNotebook {
     background-color: #323232;
@@ -467,7 +468,7 @@ class MyWindow(Gtk.Window): # Main app
             self.data = i
 
         ####
-        # Create self.notebook page(1) using `self.home()` method        
+        # Create self.notebook page(1)        
         page1 = Home(self.data, self)
         # Add CSS class to page1
         home_style = page1.get_style_context()
@@ -479,7 +480,7 @@ class MyWindow(Gtk.Window): # Main app
         self.notebook.append_page(page1, home)
 
         ####
-        # Create self.notebook page(2) using `self.repo` method
+        # Create self.notebook page(2)
         page2 = Repo(self.data, self)
         # Add CSS class to page2
         page2_style = page2.get_style_context()
@@ -490,7 +491,7 @@ class MyWindow(Gtk.Window): # Main app
         self.notebook.append_page(page2, title)
 
         ####
-        # Create self.notebook page(3) using `self.repo` method
+        # Create self.notebook page(3)
         page3 = Working(self)
         # Add CSS class to page3
         page3_style = page3.get_style_context()
@@ -501,7 +502,7 @@ class MyWindow(Gtk.Window): # Main app
         self.notebook.append_page(page3, title)
         
         ####
-        # Create self.notebook page(4) using `self.repo` method
+        # Create self.notebook page(4)
         page4 = Idea(self.notebook, self)
         # Add CSS class to page4
         page4_style = page4.get_style_context()
@@ -1149,12 +1150,12 @@ class Working(Gtk.Box):
         id_label.set_xalign(0)
         name_label = Gtk.Label()
         name_label.set_markup("<b>Project Name</b>")
-        url_label = Gtk.Label()
-        url_label.set_markup("<b>Project URL</b>")
+        path_label = Gtk.Label()
+        path_label.set_markup("<b>Project Path</b>")
 
         hbox.pack_start(id_label, False, True, 5)
         hbox.pack_start(name_label, False, True, 0)
-        hbox.pack_start(url_label, False, True, 0)
+        hbox.pack_start(path_label, False, True, 0)
 
         listbox.add(row)
 
@@ -1186,10 +1187,7 @@ class Working(Gtk.Box):
 
             self.toggle = Gtk.ToggleButton(label="done")
             id = data[i][0]
-            status = status = app.getProjectStatus(id)
-            if(status == 1):
-                self.toggle.set_active("True")
-            self.toggle.connect("toggled", self.toggleSwitch, id) 
+            self.toggle.connect("toggled", self.projectDone, id) 
             hbox.pack_end(self.toggle, False, True, 5)
             # Add the row to listbox
             listbox.add(row)
@@ -1259,7 +1257,7 @@ class Working(Gtk.Box):
         vbox_l.pack_start(project_audience, False, True, 0)
 
         url_label = Gtk.Label()
-        url_label.set_markup("<i>Project URL</i>")
+        url_label.set_markup("<i>Project Path</i>")
 
         vbox_l.pack_start(url_label, False, True, 0)
 
@@ -1365,17 +1363,74 @@ class Working(Gtk.Box):
         dialog.run()
         dialog.destroy()
 
+    
+    def projectDone(self, button, id):
+        window = Gtk.Window()
+        window.set_title("GNOME Project Manager - Delete Account")
+        window.set_default_size(550, 350)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        vbox.set_halign(Gtk.Align.CENTER)
+
+        title = Gtk.Label()
+        title.set_markup("<span size='x-large'>Project Done</span>")
+        title.set_margin_top(20)
+        vbox.pack_start(title, False, True, 15)
+
+        note = Gtk.Label()
+        note.set_markup('''
+        <i>Are you sure you are done with working on this project? 
+        This will delete the project data from database permanently!</i>
+        ''')
+        vbox.pack_start(note, False, True, 0)
+
+        line_separator = Gtk.Separator()
+        vbox.pack_start(line_separator, False, True, 5)
+
+        buttons = Gtk.Box(spacing = 6)
+        buttons.set_halign(Gtk.Align.CENTER)
+
+        confirm = Gtk.Button(label="Yes")
+        confirm.connect("clicked", self.toggleSwitch, id, window)
+
+        exit = Gtk.Button(label="No")
+        exit.connect("clicked", self.close, window)
+
+        buttons.pack_start(confirm, False, True, 0)
+        buttons.pack_start(exit, False, True, 0)
+
+        vbox.pack_start(buttons, False, True, 10)
+
+        window.add(vbox)
+        window.show_all()
+    
+
     # Function - toggleSwitch
     # This allows the user to switch the toggleSwitch widget on/off
-    def toggleSwitch(self, toggle, id):
-        status = app.getProjectStatus(id)
-        if (status == 0):
-            app.toggleProject(1, id, uname)
+    def toggleSwitch(self, button, id, window):
+        app.toggleProject(1, id, uname)
+        self.close('', window)
 
         refresh = app.getAutoRefresh(uname)
         if refresh == 1:
             MyWindow.refreshApp(self.main, '')
             return 1
+
+        dialog = Gtk.MessageDialog(
+            parent = MyWindow(),
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text='''
+            Project Deleted!
+            Please refresh the app!
+            '''
+        )
+        dialog.run()
+        dialog.destroy()
+
+    def close(self, button, window):
+        window.destroy()
 
     def createPanel(self, button, id):
         panel = projectPanel(id)
@@ -1894,7 +1949,7 @@ class projectPanel(Gtk.Window):
         notebook_style.add_class("myNotebook")
 
         ####
-        # Create self.notebook page(1) using `self.home()` method        
+        # Create self.notebook page(1)     
         page1 = Info(self.data, self, self.id)
         # Add CSS class to page1
         home_style = page1.get_style_context()
@@ -1904,6 +1959,18 @@ class projectPanel(Gtk.Window):
         home.set_size_request(150, 50)
         home.set_xalign(0)
         self.notebook.append_page(page1, home)
+
+        ####
+        # Create self.notebook page(2)      
+        page2 = Code(self.data[6], self, self.id)
+        # Add CSS class to page1
+        home_style = page2.get_style_context()
+        home_style.add_class("home")
+        # Set the name of the page as `Home`
+        code = Gtk.Label(label="\nStart Coding\n")
+        code.set_size_request(150, 50)
+        code.set_xalign(0)
+        self.notebook.append_page(page2, code)
 
         self.add(self.notebook)
         self.show_all()
@@ -1953,7 +2020,7 @@ class Info(Gtk.Box):
         self.data = data
         # Set title of the window
         title = Gtk.Label()
-        title.set_markup(f"<span size='xx-large'> Project {self.data[0]}! </span>")
+        title.set_markup(f"<span size='xx-large'> {self.data[0]} </span>")
         title.set_margin_top(40)
         self.pack_start(title, False, True, 0)  
         # Create a vertical box container for containing stack and stack_switcher
@@ -2092,21 +2159,36 @@ class Info(Gtk.Box):
         detail.pack_start(detail_input, True, True, 40)
 
         form.pack_start(detail, False, True, 0)
+
+        path = Gtk.Box(spacing=8)
+
+        path_label = Gtk.Label()
+        path_label.set_markup("<b>Project Directory*</b>")
+
+        path_input = Gtk.FileChooserButton()
+        path_input.set_title("GNOME Project Manager - Select Folder")
+        path_input.set_action(Gtk.FileChooserAction.SELECT_FOLDER)
+
+        path.pack_start(path_label, False, True, 40)
+        path.pack_start(path_input, True, True, 40)
+
+        form.pack_start(path, False, True, 0)
         # Child element of the form - submit button linked to `self.recordInfo`        
         submit = Gtk.Button(label="Confirm")
-        submit.connect("clicked", self.updateData, name_input, language_input, type_input, audience_input, feature_input, detail_input)
+        submit.connect("clicked", self.updateData, name_input, language_input, type_input, audience_input, feature_input, detail_input, path_input)
         form.pack_start(submit, False, True, 0)
 
         return form
     
 
-    def updateData(self, button, name_input, language_input, type_input, audience_input, feature_input, detail_input):
+    def updateData(self, button, name_input, language_input, type_input, audience_input, feature_input, detail_input, path_input):
         name = name_input.get_text()
         language = language_input.get_text()
         type = type_input.get_text()
         audience = audience_input.get_text()
         feature = feature_input.get_text()
         detail = detail_input.get_text()
+        path = path_input.get_uris()
 
 
          # Check for the validity of the data
@@ -2122,7 +2204,22 @@ class Info(Gtk.Box):
             dialog.destroy()
             return 0
 
-        app.updateProjectData(self.id, name, language, type, audience, feature, detail)
+        try:
+            if(path[0]):
+                pass
+        except:
+            dialog = Gtk.MessageDialog(
+                parent = self.main,
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.CANCEL,
+                text="Project URL cannot be empty!"
+            )
+            dialog.run()
+            dialog.destroy()
+            return 0
+
+        app.updateProjectData(self.id, name, language, type, audience, feature, detail, path[0])
 
         try:
             refresh = app.getAutoRefresh(uname)
@@ -2155,6 +2252,148 @@ class Info(Gtk.Box):
             dialog.destroy()
     
 
+class Code(Gtk.Box):
+    def __init__(self, address, main, id):
+        Gtk.Box.__init__(self)
+        self.set_orientation(Gtk.Orientation.VERTICAL)
+        self.set_spacing(15)
+
+        self.main = main
+        self.id = id
+
+        title = Gtk.Label()
+        title.set_markup("<span size='xx-large'>Starting Coding</span>")
+        title.set_margin_top(50)
+        self.pack_start(title, False, True, 15)
+
+        selectIDE = Gtk.Box(spacing=6)
+        selectIDE.set_halign(Gtk.Align.CENTER)
+
+        label = Gtk.Label()
+        label.set_markup("<b>Choose a code editor</b>")
+
+        selectIDE.pack_start(label, False, True, 0)
+
+        self.selector = Gtk.ComboBoxText()
+        self.selector.insert(0, "0", "Visual Studio Code")
+        self.selector.insert(1, "1", "Sublime Text")
+        self.selector.set_active(0)
+        selectIDE.pack_start(self.selector, False, True, 0)
+
+        about_button = Gtk.Button()
+        about_button.connect("clicked", self.about)
+        about_icon = Gio.ThemedIcon(name="dialog-information-symbolic")
+        about_image = Gtk.Image.new_from_gicon(about_icon, Gtk.IconSize.BUTTON)
+        about_button.add(about_image)
+        selectIDE.pack_start(about_button, False, True, 10)
+
+        self.pack_start(selectIDE, False, True, 0)
+
+        button = Gtk.Button(label="Start Coding")
+        button.connect("clicked", self.runIDE, address)
+        button.set_halign(Gtk.Align.CENTER)
+
+        self.pack_start(button, False, True, 0)
+
+        todo_label = Gtk.Label()
+        todo_label.set_markup("<span size='large'> Todo List </span>")
+        todo_label.set_halign(Gtk.Align.START)
+
+        self.pack_start(todo_label, False, True, 5)
+
+        todo = app.getTodo(self.id)
+
+        if todo == '':
+            todo = "\n1.\n2.\n3.\n4.\n\n\n\n\n\n\n\n\n"
+
+        todo_box = Gtk.Box(spacing=6)
+
+        todo_list = Gtk.TextView()
+        textbuffer = todo_list.get_buffer()
+        textbuffer.set_text(todo)
+        todo_box.pack_start(todo_list, True, True, 10)
+
+        todo_button = Gtk.Button(label="Update Todo")
+        todo_button.connect("clicked", self.recordTodo, textbuffer)
+
+        self.pack_start(todo_box, False, False, 0)
+        self.pack_start(todo_button, False, True, 0)
+
+
+    def runIDE(self, button, address):
+        IDE = self.selector.get_active()
+        if IDE == 0:
+            try:
+                os.system(f"code --folder-uri {address}")
+            except:
+                dialog = Gtk.MessageDialog(
+                    parent = self.main,
+                    flags= 0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text = "Invalid URL",
+                )
+                dialog.run()
+                dialog.destroy()
+                return 0
+        elif IDE == 1:
+            try:
+                os.system(f"subl {address[5:]}")
+            except:
+                dialog = Gtk.MessageDialog(
+                    parent = self.main,
+                    flags= 0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text = "Invalid URL",
+                )
+                dialog.run()
+                dialog.destroy()
+                return 0
+
+    def recordTodo(self, button, textbuffer):
+        start = textbuffer.get_start_iter()
+        end = textbuffer.get_end_iter()
+
+        todo_content = textbuffer.get_text(start, end, True)
+        app.updateTodo(self.id, todo_content)
+
+        refresh = app.getAutoRefresh(uname)
+        if refresh == 1:
+            projectPanel.refreshApp(self.main, '')
+            return 1
+
+        dialog = Gtk.MessageDialog(
+            parent = self.main,
+            flags = 0,
+            message_type = Gtk.MessageType.INFO,
+            buttons = Gtk.ButtonsType.OK,
+            text = 
+            '''
+            Todo List updated!
+            Please refresh the app!
+            '''
+        )
+
+        dialog.run()
+        dialog.destroy()
+
+
+    def about(self, button):
+        dialog = Gtk.MessageDialog(
+            parent = self.main,
+            flags = 0,
+            message_type = Gtk.MessageType.INFO,
+            buttons = Gtk.ButtonsType.OK,
+            text = 
+            '''
+            Only 2 IDEs are available at this stage
+            (the developer of this app cannot handle Vim)
+            '''
+        )
+
+        dialog.run()
+        dialog.destroy()        
 
 
 # Function - varify
