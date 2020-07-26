@@ -28,3 +28,4 @@ def decrypt(key, encrypted):
         password += (chr(decrypted[i]))
 
     return password
+
