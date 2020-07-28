@@ -4,7 +4,6 @@
 
 Have you ever felt tired about opening a ton of softwares (IDE, To-Do List, Web Browsers etc.) and having a messy desktop environment while developing a large project? GNOME Project Manager will solve all your problems!
 
----
 
 ## Features
 
@@ -20,7 +19,6 @@ Have you ever felt tired about opening a ton of softwares (IDE, To-Do List, Web 
   - Stack on a bug? Search online using the built-in **Search** feature connected to Google and StackOverflow with **search history** enabled!
   - Bookmark useful resources (documentations, tutorials etc.)!
 
----
 
 ## Screenshots
 
@@ -36,14 +34,12 @@ Have you ever felt tired about opening a ton of softwares (IDE, To-Do List, Web 
 
 ![Search](screenshots/search.png)
 
----
 
 ## Thanks
 
 - https://python-gtk-3-tutorial.readthedocs.io/
 - https://stackoverflow.com/questions/7160737/python-how-to-validate-a-url-in-python-malformed-or-not
 
----
 
 ## Licensee
 
