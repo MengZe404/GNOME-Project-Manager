@@ -1,19 +1,16 @@
-import threading
-import time
 
-def timer_function():
-    hour = minute = second = 0
-    while minute < 1:
-        second += 1
-        time.sleep(1)
-        if second == 60:
-            second = 0
-            minute += 1
-        if minute == 60:
-            minute = 0
-            hour += 1 
-        print(f"{hour:02d}:{minute:02d}:{second:02d}")
+run = True
+def timer():
+    start = time.time()
+    while True:
+        current = time.time()
+        if current - start == 1800:
+            Notify.init("GNOME Project Manager")
+            Notify.Notification.new("You have been working for 30 minutes!", "It's time to take a break!").show()
+            Notify.uninit()
+            return False
+        elif run == False:
+            return False
 
-
-timer = threading.Thread(target=timer, args=())
-timer.start()
+thread = threading.Thread(target=timer, args=())
+thread.start()

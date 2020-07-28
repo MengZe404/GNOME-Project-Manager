@@ -1,14 +1,19 @@
-from gpm import MyGPM # This provides all the main functionalities and database access
+from libgpm import MyGPM # This provides all the main functionalities and database access
 import password # This provides the functionality to decrypt data from the database
 
+import threading
 from sys import argv, exit 
 import subprocess # This provides the functionality to open other softwares
 import os
+import time
+import random
 
 # Modules for GUI design
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gio, Gdk
+gi.require_version('Notify', '0.7')
+from gi.repository import Gtk, Gio, Gdk, Notify
+
 
 # CSS styleshee
 CSS = b"""
@@ -56,6 +61,7 @@ class Login(Gtk.Window): # Login Window
     def __init__(self):
         # Create window
         Gtk.Window.__init__(self) 
+        self.connect("destroy", Gtk.main_quit)
         # Initialise window
         self.set_default_size(360,500) 
         self.set_border_width(5)
@@ -63,6 +69,7 @@ class Login(Gtk.Window): # Login Window
         # Create content
         window = self.loginWindow()
         self.add(window) # add content to the window
+        self.show_all()
 
     # Fucntion: create login window
     def loginWindow(self): # Create contents
@@ -125,6 +132,7 @@ class Login(Gtk.Window): # Login Window
         # Add form to the main box
         self.window.pack_start(form, True, True, 0)
         return self.window
+        
 
     # Function: get the user input and varify the user account for login
     def getInfo(self, button, uname_input, pword_input):
@@ -275,8 +283,8 @@ class Login(Gtk.Window): # Login Window
         # Check for the validity of the data
         if(uname == '' or pword1 == '' or name == '' or email == ''):
             dialog = Gtk.MessageDialog(
-                self.register,
-                0,
+                parent = self.register,
+                flags = 0,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.CANCEL,
                 text="Fields with * can not be empty!",
@@ -286,8 +294,8 @@ class Login(Gtk.Window): # Login Window
             return 0
         elif(pword1 != pword2):
             dialog = Gtk.MessageDialog(
-                self.register,
-                0,
+                parent = self.register,
+                flags = 0,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.CANCEL,
                 text="Please make sure your password matches!",
@@ -297,8 +305,8 @@ class Login(Gtk.Window): # Login Window
             return 0
         elif(len(pword1) <= 6): # Password must be longer than 6 chars (for security)
             dialog = Gtk.MessageDialog(
-                self.register,
-                0,
+                parent = self.register,
+                flags = 0,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.CANCEL,
                 text="Your password is too short! (length > 6)",
@@ -307,6 +315,20 @@ class Login(Gtk.Window): # Login Window
             dialog.destroy()
             return 0
         # Register the account and save the data into `main.db`
+
+        check = app.checkAccount(uname)
+        if check == True:
+            dialog = Gtk.MessageDialog(
+                parent = self.register,
+                flags = 0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.CANCEL,
+                text="The user account with this GitHub username is registered!",
+            )
+            dialog.run()
+            dialog.destroy()
+            return 0
+
         app.register(uname, pword1, name, email, github)
         pword = pword1
         try:
@@ -394,16 +416,16 @@ class Login(Gtk.Window): # Login Window
         # If there is a password that matches the username and email
         if (password != None):
             dialog = Gtk.MessageDialog(
-                    self.window,
-                    0,
+                    parent = self.window,
+                    flags = 0,
                     message_type=Gtk.MessageType.INFO,
                     buttons=Gtk.ButtonsType.OK,
                     text=f"Your password is: {password}",
             )
         else:
             dialog = Gtk.MessageDialog(
-                self.window,
-                0,
+                parent = self.window,
+                flags = 0,
                 message_type=Gtk.MessageType.ERROR,
                 buttons=Gtk.ButtonsType.OK,
                 text=f"Incorrect email address",
@@ -421,7 +443,8 @@ class MyWindow(Gtk.Window): # Main app
     def __init__(self):
         varify()
         Gtk.Window.__init__(self)
-        self.set_default_size(0,650)
+        self.set_default_size(1100,650)
+
         # Set stylesheet
         cssprovider = Gtk.CssProvider()
         cssprovider.load_from_data(CSS)
@@ -440,19 +463,6 @@ class MyWindow(Gtk.Window): # Main app
         about_button.add(about_image)
         hb.pack_end(about_button)
 
-        refresh = Gtk.Button(label="Refresh App")
-        refresh.connect("clicked", self.refreshApp)
-        hb.pack_start(refresh)
-
-        auto_refresh = Gtk.CheckButton(label="auto refresh")
-        auto_refresh.connect("toggled", self.autoRefresh)
-        hb.pack_start(auto_refresh)
-
-        status = app.getAutoRefresh(uname)
-        if status == 1:
-            auto_refresh.set_active(True)
-        else:
-            auto_refresh.set_active(False)
         # Set the titlebar of the window to hb
         self.set_titlebar(hb)
         # Create Notebook
@@ -525,6 +535,7 @@ class MyWindow(Gtk.Window): # Main app
                 title.set_xalign(0)
                 self.notebook.append_page(page, title)
         self.add(self.notebook)
+        self.connect("destroy", Gtk.main_quit)
 
     # Function: create AboutDialog that displayed on the title bar
     def about(self, button):
@@ -544,20 +555,18 @@ class MyWindow(Gtk.Window): # Main app
         aboutdialog.show_all()
 
     
-    def refreshApp(self, button):
+    def refreshApp(self, button, page=''):
+        if page == '':
+            page = self.notebook.get_current_page()
         self.set_visible(False)
         window = MyWindow()
         window.connect("destroy", Gtk.main_quit)
         window.show_all()
+        window.set_page(page)
+        
+    def set_page(self, page):
+        self.notebook.set_current_page(page)
 
-    
-    def autoRefresh(self, checkbutton):
-        if(checkbutton.get_active()):
-            status = 1
-        else:
-            status = 0
-
-        app.updateAutoRefresh(uname, status)
 
 ##########################################################################
 
@@ -620,6 +629,7 @@ class Home(Gtk.Box):
     def guide(self, button):
         Guide()
 
+
     def deleteWindow(self, button, uname):
         window = Gtk.Window()
         window.set_title("GNOME Project Manager - Delete Account")
@@ -658,9 +668,23 @@ class Home(Gtk.Box):
 
     def deleteAccount(self, button, message_input, window):
         message = message_input.get_text()
+        global run
         if message == "Delete my account":
             app.deleteAccount(uname)
-            self.destroy()
+            dialog = Gtk.MessageDialog(
+                parent=window,
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text = '''
+                Account deleted!
+                '''
+            )
+            dialog.run()
+            dialog.destroy()
+            run = False
+            exit()
+            return run
         else:
             dialog = Gtk.MessageDialog(
                 parent=window,
@@ -690,6 +714,7 @@ class Home(Gtk.Box):
 
     # Function: create ListBox and ListBoxRows with given data
     def makeProfile(self, item, content):
+        window = Gtk.ScrolledWindow()
         # Create listbox
         listbox = Gtk.ListBox()
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -713,7 +738,8 @@ class Home(Gtk.Box):
             hbox.pack_start(content_label, False, True, 10)
             # Add the row to listbox
             listbox.add(row)
-        return listbox
+        window.add(listbox)
+        return window
     
     def editProfile(self, data):
         # Create form
@@ -724,7 +750,10 @@ class Home(Gtk.Box):
         name_label.set_markup("<b>Name*    </b>")
         name_input = Gtk.Entry()
         name_input.set_placeholder_text("Name*")
-        name_input.set_text(data[4])
+        try:
+            name_input.set_text(data[4])
+        except:
+            pass
 
         name.pack_start(name_label, False, True, 40)
         name.pack_start(name_input, True, True, 40)
@@ -736,7 +765,10 @@ class Home(Gtk.Box):
         email_label.set_markup("<b>Email*     </b>")
         email_input = Gtk.Entry()
         email_input.set_placeholder_text("Email Address")
-        email_input.set_text(data[2])
+        try:
+            email_input.set_text(data[2])
+        except:
+            pass
         
         email.pack_start(email_label, False, True, 40)
         email.pack_start(email_input, True, True, 40)
@@ -748,7 +780,10 @@ class Home(Gtk.Box):
         github_label.set_markup("<b>URL         </b>")
         github_input = Gtk.Entry()
         github_input.set_placeholder_text("GitHub Page URL")
-        github_input.set_text(data[1])
+        try:
+            github_input.set_text(data[1])
+        except:
+            pass
 
         github.pack_start(github_label, False, True, 40)
         github.pack_start(github_input, True, True, 40)
@@ -760,7 +795,10 @@ class Home(Gtk.Box):
         location_label.set_markup("<b>Location </b>")
         location_input = Gtk.Entry()
         location_input.set_placeholder_text("Location")
-        location_input.set_text(data[8])
+        try:
+            location_input.set_text(data[8])
+        except:
+            pass
 
         location.pack_start(location_label, False, True, 40)
         location.pack_start(location_input, True, True, 40)
@@ -772,7 +810,10 @@ class Home(Gtk.Box):
         company_label.set_markup("<b>Company</b>")
         company_input = Gtk.Entry()
         company_input.set_placeholder_text("Company")
-        company_input.set_text(data[7])
+        try:
+            company_input.set_text(data[7])
+        except:
+            pass
 
         company.pack_start(company_label, False, True, 40)
         company.pack_start(company_input, True, True, 40)
@@ -985,6 +1026,7 @@ class Repo(Gtk.Box):
     # Function: create ListBox and ListBoxRows with given data
     def makeRepo(self, data):
         # Create listbox
+        window = Gtk.ScrolledWindow()
         listbox = Gtk.ListBox()
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
 
@@ -1050,7 +1092,9 @@ class Repo(Gtk.Box):
             hbox.pack_end(self.toggle, False, True, 5)
             # Add the row to listbox
             listbox.add(row)
-        return listbox
+
+        window.add(listbox)
+        return window
 
     # Function - toggleSwitch
     # This allows the user to switch the toggleSwitch widget on/off
@@ -1060,11 +1104,8 @@ class Repo(Gtk.Box):
             app.toggleRepo(0, id, uname)
         else:
             app.toggleRepo(1, id, uname)
-
-        refresh = app.getAutoRefresh(uname)
-        if refresh == 1:
-            MyWindow.refreshApp(self.main, '')
-            return 1
+            
+        MyWindow.refreshApp(self.main, '')
 
 
 # Class - Working
@@ -1139,6 +1180,8 @@ class Working(Gtk.Box):
 
     def makeProjectWorking(self, data):
         # Create listbox
+        window = Gtk.ScrolledWindow()
+
         listbox = Gtk.ListBox()
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
         row = Gtk.ListBoxRow()
@@ -1191,10 +1234,13 @@ class Working(Gtk.Box):
             hbox.pack_end(self.toggle, False, True, 5)
             # Add the row to listbox
             listbox.add(row)
-        return listbox
+        window.add(listbox)
+        return window
 
 
     def createNewProjectWindow(self):
+        scrolled_window = Gtk.ScrolledWindow()
+
         window = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=100)
         window.set_halign(Gtk.Align.CENTER)
 
@@ -1297,7 +1343,8 @@ class Working(Gtk.Box):
         record.connect("clicked", self.createProject, name_input, type_input, language_input, audience_input, feature_textbuffer, detail_textbuffer, url_input)
         vbox_r.pack_start(record, False, True, 20)
 
-        return window
+        scrolled_window.add(window)
+        return scrolled_window
 
     def createProject(self, button, name_input, type_input, language_input, audience_input, feature_textbuffer, detail_textbuffer, url_input):
         name = name_input.get_text()
@@ -1344,10 +1391,6 @@ class Working(Gtk.Box):
 
         app.insertProjectDB(uname, name, language, type, audience, feature, detail, url[0])
 
-        refresh = app.getAutoRefresh(uname)
-        if refresh == 1:
-            MyWindow.refreshApp(self.main, '')
-            return 1
 
         dialog = Gtk.MessageDialog(
             parent = MyWindow(),
@@ -1356,24 +1399,24 @@ class Working(Gtk.Box):
             buttons=Gtk.ButtonsType.OK,
             text='''
             Project added!
-            Please refresh the app!
             '''
         )
 
         dialog.run()
         dialog.destroy()
+        MyWindow.refreshApp(self.main, '')
 
     
     def projectDone(self, button, id):
         window = Gtk.Window()
         window.set_title("GNOME Project Manager - Delete Account")
-        window.set_default_size(550, 350)
+        window.set_default_size(550, 300)
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         vbox.set_halign(Gtk.Align.CENTER)
 
         title = Gtk.Label()
-        title.set_markup("<span size='x-large'>Project Done</span>")
+        title.set_markup("<span size='xx-large'>Project Done</span>")
         title.set_margin_top(20)
         vbox.pack_start(title, False, True, 15)
 
@@ -1411,11 +1454,6 @@ class Working(Gtk.Box):
         app.toggleProject(1, id, uname)
         self.close('', window)
 
-        refresh = app.getAutoRefresh(uname)
-        if refresh == 1:
-            MyWindow.refreshApp(self.main, '')
-            return 1
-
         dialog = Gtk.MessageDialog(
             parent = MyWindow(),
             flags=0,
@@ -1423,11 +1461,11 @@ class Working(Gtk.Box):
             buttons=Gtk.ButtonsType.OK,
             text='''
             Project Deleted!
-            Please refresh the app!
             '''
         )
         dialog.run()
         dialog.destroy()
+        MyWindow.refreshApp(self.main, '')
 
     def close(self, button, window):
         window.destroy()
@@ -1500,6 +1538,8 @@ class Idea(Gtk.Box):
 
 
     def createIdeaWindow(self):
+        scrolled_window =Gtk.ScrolledWindow()
+
         window = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=100)
         window.set_halign(Gtk.Align.CENTER)
 
@@ -1592,7 +1632,8 @@ class Idea(Gtk.Box):
         
         vbox_r.pack_end(record, False, True, 20)
 
-        return window
+        scrolled_window.add(window)
+        return scrolled_window
     
     def recordIdea(self, button, name_input, type_input, language_input, audience_input, feature_textbuffer, detail_textbuffer):
         name = name_input.get_text()
@@ -1731,23 +1772,7 @@ class IdeaPage(Gtk.Box):
     def deleteIdea(self, button):
         id = self.data[0]
         app.deleteIdea(id)
-        refresh = app.getAutoRefresh(uname)
-        if refresh == 1:
-            MyWindow.refreshApp(self.main, '')
-            return 1
-
-        dialog = Gtk.MessageDialog(
-            parent = MyWindow(),
-            flags= 0,
-            message_type=Gtk.MessageType.INFO,
-            buttons=Gtk.ButtonsType.OK,
-            text = '''
-            Please refresh the app to load new data!
-            ''',
-        )
-        dialog.run()
-        dialog.destroy()
-
+        MyWindow.refreshApp(self.main, '', 2)
     
     def startProject(self, button, uname):
         app.insertProjectDB(uname, password.decrypt(8, self.data[1]), self.data[2], self.data[3], self.data[4], password.decrypt(8, self.data[5]), password.decrypt(8, self.data[6]))
@@ -1859,38 +1884,9 @@ class IdeaPage(Gtk.Box):
             dialog.destroy()
             return 0
 
-        try:
-            app.updateIdeaData(id, name, language, type, audience, feature, detail)
-
-            refresh = app.getAutoRefresh(uname)
-            if refresh == 1:
-                MyWindow.refreshApp(self.main, '')
-                return 1
-
-            dialog = Gtk.MessageDialog(
-                parent = MyWindow(),
-                flags= 0,
-                message_type=Gtk.MessageType.INFO,
-                buttons=Gtk.ButtonsType.OK,
-                text = '''
-                Updated!
-                Please refresh the app to load new data!
-                ''',
-            )
-            dialog.run()
-            dialog.destroy()
+        app.updateIdeaData(id, name, language, type, audience, feature, detail)
+        MyWindow.refreshApp(self.main, '')
             
-        except:
-            dialog = Gtk.MessageDialog(
-                parent = MyWindow(),
-                flags= 0,
-                message_type=Gtk.MessageType.ERROR,
-                buttons=Gtk.ButtonsType.CANCEL,
-                text = "Failed updating data!",
-            )
-            dialog.run()
-            dialog.destroy()
-
     
 ##########################################################################
 
@@ -1928,16 +1924,6 @@ class projectPanel(Gtk.Window):
         refresh.connect("clicked", self.refreshApp)
         hb.pack_start(refresh)
 
-        auto_refresh = Gtk.CheckButton(label="auto refresh")
-        auto_refresh.connect("toggled", self.autoRefresh)
-        hb.pack_start(auto_refresh)
-
-        status = app.getAutoRefresh(uname)
-        if status == 1:
-            auto_refresh.set_active(True)
-        else:
-            auto_refresh.set_active(False)
-
         # Set the titlebar of the window to hb
         self.set_titlebar(hb)
         # Create Notebook
@@ -1972,6 +1958,30 @@ class projectPanel(Gtk.Window):
         code.set_xalign(0)
         self.notebook.append_page(page2, code)
 
+        ####
+        # Create self.notebook page(3)      
+        page3 = Search(self, self.id)
+        # Add CSS class to page1
+        home_style = page3.get_style_context()
+        home_style.add_class("home")
+        # Set the name of the page as `Home`
+        stack_overflow = Gtk.Label(label="\nSearch\n")
+        stack_overflow.set_size_request(150, 50)
+        stack_overflow.set_xalign(0)
+        self.notebook.append_page(page3, stack_overflow)
+
+        ####
+        # Create self.notebook page(4)      
+        page4 = Resources(self, self.id)
+        # Add CSS class to page1
+        home_style = page4.get_style_context()
+        home_style.add_class("home")
+        # Set the name of the page as `Home`
+        resources = Gtk.Label(label="\nResources\n")
+        resources.set_size_request(150, 50)
+        resources.set_xalign(0)
+        self.notebook.append_page(page4, resources)
+
         self.add(self.notebook)
         self.show_all()
 
@@ -1992,19 +2002,16 @@ class projectPanel(Gtk.Window):
         aboutdialog.set_title("About")
         aboutdialog.show_all()
 
-    
     def refreshApp(self, button):
+        page = self.notebook.get_current_page()
         self.set_visible(False)
         window = projectPanel(self.id)
         window.show_all()
+        window.set_page(page)
 
-    
-    def autoRefresh(self, checkbutton):
-        if(checkbutton.get_active()):
-            status = 1
-        else:
-            status = 0
-        app.updateAutoRefresh(uname, status)
+    def set_page(self, page):
+        self.notebook.set_current_page(page)
+
 
 
 class Info(Gtk.Box):
@@ -2222,23 +2229,18 @@ class Info(Gtk.Box):
         app.updateProjectData(self.id, name, language, type, audience, feature, detail, path[0])
 
         try:
-            refresh = app.getAutoRefresh(uname)
-            if refresh == 1:
-                projectPanel.refreshApp(self.main, '')
-                return 1
-
             dialog = Gtk.MessageDialog(
                 parent = self.main,
                 flags= 0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
                 text = '''
-                Updated!
-                Please refresh the app to load new data!
+                Project data updated!
                 ''',
             )
             dialog.run()
             dialog.destroy()
+            projectPanel.refreshApp(self.main, '')
             
         except:
             dialog = Gtk.MessageDialog(
@@ -2250,7 +2252,7 @@ class Info(Gtk.Box):
             )
             dialog.run()
             dialog.destroy()
-    
+
 
 class Code(Gtk.Box):
     def __init__(self, address, main, id):
@@ -2296,15 +2298,20 @@ class Code(Gtk.Box):
         self.pack_start(button, False, True, 0)
 
         todo_label = Gtk.Label()
-        todo_label.set_markup("<span size='large'> Todo List </span>")
+        todo_label.set_markup("<span size='x-large'> <u> Todo List </u> </span>")
         todo_label.set_halign(Gtk.Align.START)
 
         self.pack_start(todo_label, False, True, 5)
 
+        window = Gtk.ScrolledWindow()
+        window.set_size_request(0, 250)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
         todo = app.getTodo(self.id)
 
         if todo == '':
-            todo = "\n1.\n2.\n3.\n4.\n\n\n\n\n\n\n\n\n"
+            todo = "1.\n2.\n3.\n4.\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 
         todo_box = Gtk.Box(spacing=6)
 
@@ -2313,10 +2320,13 @@ class Code(Gtk.Box):
         textbuffer.set_text(todo)
         todo_box.pack_start(todo_list, True, True, 10)
 
+        vbox.pack_start(todo_box, False, False, 0)
+
+        window.add(vbox)
+        self.pack_start(window, False, True, 0)
+
         todo_button = Gtk.Button(label="Update Todo")
         todo_button.connect("clicked", self.recordTodo, textbuffer)
-
-        self.pack_start(todo_box, False, False, 0)
         self.pack_start(todo_button, False, True, 0)
 
 
@@ -2358,25 +2368,7 @@ class Code(Gtk.Box):
         todo_content = textbuffer.get_text(start, end, True)
         app.updateTodo(self.id, todo_content)
 
-        refresh = app.getAutoRefresh(uname)
-        if refresh == 1:
-            projectPanel.refreshApp(self.main, '')
-            return 1
-
-        dialog = Gtk.MessageDialog(
-            parent = self.main,
-            flags = 0,
-            message_type = Gtk.MessageType.INFO,
-            buttons = Gtk.ButtonsType.OK,
-            text = 
-            '''
-            Todo List updated!
-            Please refresh the app!
-            '''
-        )
-
-        dialog.run()
-        dialog.destroy()
+        projectPanel.refreshApp(self.main, '')
 
 
     def about(self, button):
@@ -2396,6 +2388,322 @@ class Code(Gtk.Box):
         dialog.destroy()        
 
 
+class Search(Gtk.Box):
+    def __init__(self, main, id):
+        Gtk.Box.__init__(self)
+        self.set_orientation(Gtk.Orientation.VERTICAL)
+        self.set_spacing(15)
+
+        self.main = main
+        self.id = id
+
+        title = Gtk.Label()
+        title.set_markup("<span size='xx-large'> Search Online </span>")
+        title.set_margin_top(50)
+
+        self.pack_start(title, False, True, 5)
+
+        selectBrowser = Gtk.Box(spacing=6)
+        selectBrowser.set_halign(Gtk.Align.CENTER)
+
+        label = Gtk.Label()
+        label.set_markup("<b>Choose a browser</b>")
+
+        selectBrowser.pack_start(label, False, True, 0)
+
+        self.browser_selector = Gtk.ComboBoxText()
+        self.browser_selector.insert(0, "0", "Firefox")
+        self.browser_selector.insert(1, "1", "Google Chrome")
+        self.browser_selector.set_active(0)
+        selectBrowser.pack_start(self.browser_selector, False, True, 0)
+
+        about_button = Gtk.Button()
+        about_button.connect("clicked", self.about)
+        about_icon = Gio.ThemedIcon(name="dialog-information-symbolic")
+        about_image = Gtk.Image.new_from_gicon(about_icon, Gtk.IconSize.BUTTON)
+        about_button.add(about_image)
+        selectBrowser.pack_start(about_button, False, True, 10)
+
+        self.pack_start(selectBrowser, False, True, 0)
+
+        search = Gtk.Box()
+        search.set_halign(Gtk.Align.CENTER)
+        search.set_size_request(700, 0)
+
+        self.website_selector = Gtk.ComboBoxText()
+        self.website_selector.insert(0, "0", "Google")
+        self.website_selector.insert(1, "1", "StackOverflow")
+        self.website_selector.set_active(0)
+
+        question_input = Gtk.Entry()
+        question_input.set_placeholder_text("Eg. How to use pyinstaller")
+
+        search.pack_start(self.website_selector, False, False, 15)
+        search.pack_start(question_input, True, True, 20)
+
+        self.pack_start(search, False, True, 5)
+
+        search = Gtk.Button(label='Search')
+        search.connect("clicked", self.search, question_input)
+
+        self.pack_start(search, False, True, 5)
+
+        history = self.history()
+
+        self.pack_start(history, True, False, 15)
+
+        clear = Gtk.Button(label='Clear History')
+        clear.connect("clicked", self.clearHistory)
+        self.pack_end(clear, False, True, 0)
+
+    
+    def search(self, button, question_input, question=''):
+        if question == '':
+            question = question_input.get_text()
+        browser = self.browser_selector.get_active()
+        website = self.website_selector.get_active()
+
+        if website == 0:
+            if browser == 0:
+                link = f"firefox 'https://www.google.com/search?q={question}'"
+                os.system(link)
+            elif browser == 1:
+                link = f"google-chrome 'https://www.google.com/search?q={question}'"
+                os.system(link)
+        
+        elif website == 1:
+            if browser == 0:
+                link = f"firefox 'https://stackoverflow.com/search?q={question}'"
+                os.system(link)
+            elif browser == 1:
+                link = f"google-chrome 'https://stackoverflow.com/search?q={question}'"
+                os.system(link)
+
+        app.insertSearchDB(self.id, question, link)
+        question_input.set_text('')
+        projectPanel.refreshApp(self.main, '')
+    
+    def history(self):
+        window = Gtk.ScrolledWindow()
+        window.set_size_request(0, 300)
+
+        box = Gtk.Box()
+        box.set_halign(Gtk.Align.CENTER)
+
+        self.vbox1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.vbox2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.vbox3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        box.pack_start(self.vbox1, False, True, random.randint(20, 60))
+        box.pack_start(self.vbox2, False, True, random.randint(20, 60))
+        box.pack_start(self.vbox3, False, True, random.randint(20, 60))
+
+        data = app.getHistory(self.id)
+
+        for i in data:
+            question = i[1]
+            url = i[2]
+
+            button = Gtk.Button()
+            button.set_label(question)
+            button.connect("clicked", self.search, '', question)
+            button.set_size_request(random.randint(0, 30), random.randint(30, 70))
+            container = random.randint(1, 3)
+            if container == 1:
+                self.vbox1.pack_start(button, False, False, random.randint(5, 25))
+            if container == 2:
+                self.vbox2.pack_start(button, False, False, random.randint(5, 25))
+            if container == 3:
+                self.vbox3.pack_start(button, False, False, random.randint(5, 25))
+
+        window.add(box)
+
+        return window
+
+    def visitURL(self, button, url):
+        try:
+            os.system(f"firefox '{url}'")
+        except:
+            os.system(f"google-chrome '{url}'")
+
+    def clearHistory(self, button):
+        app.clearHistory(self.id)
+        projectPanel.refreshApp(self.main, '')
+
+    def about(self, button):
+        dialog = Gtk.MessageDialog(
+            parent = self.main,
+            flags = 0,
+            message_type = Gtk.MessageType.INFO,
+            buttons = Gtk.ButtonsType.OK,
+            text = "This requires internet access!"     
+        )
+        dialog.run()
+        dialog.destroy()
+
+
+class Resources(Gtk.Box):
+    def __init__(self, main, id):
+        Gtk.Box.__init__(self)
+        self.set_spacing(15)
+        self.set_orientation(Gtk.Orientation.VERTICAL)
+
+        self.main = main
+        self.id = id
+
+        title = Gtk.Label()
+        title.set_markup("<span size='xx-large'>Resources</span>")
+        title.set_margin_top(40)
+
+        self.pack_start(title, False, True, 15)
+
+        recordName = Gtk.Box(spacing=6)
+        recordName.set_halign(Gtk.Align.CENTER)
+        recordName.set_size_request(600, 0)
+
+        name_label = Gtk.Label()
+        name_label.set_markup("<b>Website Name*</b>")
+
+        recordName.pack_start(name_label, False, True, 10)
+
+        name_input = Gtk.Entry()
+
+        recordName.pack_start(name_input, True , True, 0)
+
+        self.pack_start(recordName, False, True, 0)
+
+        recordURL = Gtk.Box(spacing=6)
+        recordURL.set_halign(Gtk.Align.CENTER)
+        recordURL.set_size_request(600, 0)
+
+        label = Gtk.Label()
+        label.set_markup("<b>Website URL*   </b>")
+
+        recordURL.pack_start(label, False, True, 10)
+
+        url_input = Gtk.Entry()
+
+        recordURL.pack_start(url_input, True , True, 0)
+
+        self.pack_start(recordURL, False, True, 0)
+
+        button = Gtk.Button(label="Record")
+        button.connect("clicked", self.recordResource, name_input, url_input)
+        self.pack_start(button, False, True, 0)
+
+        display = self.display()
+
+        self.pack_start(display, True, False, 15)
+
+        clear = Gtk.Button(label="Clear All")
+        clear.connect("clicked", self.clearResource)
+        self.pack_end(clear, False, True, 0)
+
+    
+    def recordResource(self, button, name_input, url_input):
+        name = name_input.get_text()
+        url = url_input.get_text()
+
+        if(name == '' or url == ''):
+            dialog = Gtk.MessageDialog(
+                parent = self.main,
+                flags= 0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.CANCEL,
+                text = "Fields with * can not be empty!",
+            )
+            dialog.run()
+            dialog.destroy()
+            return 0
+
+        if(app.url_validate(url) == False):
+            dialog = Gtk.MessageDialog(
+                parent=self.main,
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Invalid URL"
+            )
+
+            dialog.run()
+            dialog.destroy()
+            return 0 
+
+        app.insertResourceDB(self.id, name, url) 
+
+        button = Gtk.Button()
+        button.set_label(name)
+        button.connect("clicked", self.visitURL, url)
+        button.set_size_request(random.randint(0, 30), random.randint(30, 80))
+        container = random.randint(1, 3)
+        if container == 1:
+            self.vbox1.pack_start(button, False, False, random.randint(5, 25))
+            self.vbox1.show_all()
+        if container == 2:
+            self.vbox2.pack_start(button, False, False, random.randint(5, 25))
+            self.vbox2.show_all()
+        if container == 3:
+            self.vbox3.pack_start(button, False, False, random.randint(5, 25))
+            self.vbox3.show_all()
+
+        name_input.set_text('')
+        url_input.set_text('')
+
+        projectPanel.refreshApp(self.main, '')
+
+
+    
+    def display(self):
+        window = Gtk.ScrolledWindow()
+        window.set_size_request(0, 250)
+
+        box = Gtk.Box()
+        box.set_halign(Gtk.Align.CENTER)
+
+        self.vbox1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.vbox2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.vbox3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        box.pack_start(self.vbox1, False, True, random.randint(50, 90))
+        box.pack_start(self.vbox2, False, True, random.randint(50, 90))
+        box.pack_start(self.vbox3, False, True, random.randint(50, 90))
+
+        data = app.getResources(self.id)
+
+        for i in data:
+            name = i[1]
+            url = i[2]
+
+            button = Gtk.Button()
+            button.set_label(name)
+            button.connect("clicked", self.visitURL, url)
+            button.set_size_request(random.randint(0, 30), random.randint(30, 100))
+            container = random.randint(1, 3)
+            if container == 1:
+                self.vbox1.pack_start(button, False, False, random.randint(5, 25))
+            if container == 2:
+                self.vbox2.pack_start(button, False, False, random.randint(5, 25))
+            if container == 3:
+                self.vbox3.pack_start(button, False, False, random.randint(5, 25))
+
+        window.add(box)
+
+        return window
+
+    def visitURL(self, button, url):
+        try:
+            os.system(f"firefox '{url}'")
+        except:
+            os.system(f"google-chrome '{url}'")
+
+    
+    def clearResource(self, button):
+        app.clearResource(self.id)
+        projectPanel.refreshApp(self.main, '')
+
+
+
+    
 # Function - varify
 # This function varify the user info to prevent unauthorized access to data
 def varify():
@@ -2409,9 +2717,8 @@ def varify():
 # This runs the app
 def main():
     login = Login() # When the app runs, show the login window
-    login.connect("destroy", Gtk.main_quit)
-    login.show_all()
     Gtk.main()
+    
 
 if __name__ == "__main__":
     main()

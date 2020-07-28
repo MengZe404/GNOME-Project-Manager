@@ -9,7 +9,6 @@ CREATE TABLE users (
     company VARCHAR(255),
     user_location VARCHAR(255),
     follower INT,
-    auto_refresh INT,
     PRIMARY KEY (ID)
 );
 
@@ -62,3 +61,17 @@ CREATE TABLE projects(
     FOREIGN KEY (user_id) REFERENCES users(ID),
     FOREIGN KEY (repo_id) REFERENCES repos(REPO_ID)
 );
+
+CREATE TABLE resources(
+    project_id INT NOT NULL,
+    resource_title VARCHAR(255) NOT NULL,
+    resource_url VARCHAR(255) NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES repos(PROJECT_ID)
+);
+
+CREATE TABLE search_history(
+    project_id INT NOT NULL,
+    question VARCHAR(255) NOT NULL,
+    search_url VARCHAR(255) NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES repos(PROJECT_ID)
+)

@@ -137,19 +137,6 @@ class MyGPM(object):
         self.c.execute(update, info)
         self.connection.commit()
 
-    
-    def updateAutoRefresh(self, uname, status):
-        update = '''
-            UPDATE users 
-            SET auto_refresh=?
-            WHERE github=?
-        '''
-
-        info = (status, uname)
-
-        self.c.execute(update, info)
-        self.connection.commit()
-
 
     # Get repo data from GitHub API
     def createRepoDB(self, uname):
@@ -182,7 +169,9 @@ class MyGPM(object):
 
         self.connection.commit()
 
-    
+
+
+#### Insert Data
     def insertProjectDB(self, uname, name, language, type, audience, feature, detail, path='', date='', todo='', repo_id=0, id=0):
         if date == '':
             date = datetime.date.today()
@@ -230,10 +219,19 @@ class MyGPM(object):
         self.c.execute(insert, (idea_id, password.encrypt(8, name), language, type, audience, password.encrypt(8, feature), password.encrypt(8, detail), date, user_id))
 
         self.connection.commit()
-
         return 1
 
-    
+    def insertResourceDB(self, id, name, url):
+        self.c.execute("INSERT INTO resources (project_id, resource_title, resource_url) VALUES(?, ?, ?)", (id, name, url))
+        self.connection.commit()
+
+    def insertSearchDB(self, id, name, url):
+        self.c.execute("INSERT INTO search_history (project_id, question, search_url) VALUES(?, ?, ?)", (id, name, url))
+        self.connection.commit()
+
+
+
+#### Update Data
     def updateUserData(self, uname, name, email, url, location, company):
         update = '''
         UPDATE users
@@ -243,6 +241,7 @@ class MyGPM(object):
         data = (name, email, url, location, company, uname)
         self.c.execute(update, data)
         self.connection.commit()
+
 
     def updateIdeaData(self, id, name, language, type, audience, feature, detail):
         update = '''
@@ -268,6 +267,8 @@ class MyGPM(object):
        self.c.execute("UPDATE PROJECTS SET project_todo=? WHERE PROJECT_ID=?", (todo, id))
        self.connection.commit()
 
+
+#### Refresh & Delete data
     def refreshData(self, uname):
         self.c.execute('DELETE FROM repos WHERE repos.user_id=(SELECT ID FROM users WHERE github=?)', (uname,))
         self.connection.commit()
@@ -278,18 +279,19 @@ class MyGPM(object):
         self.c.execute("UPDATE ideas SET IDEA_ID=IDEA_ID - 1 WHERE IDEA_ID > ?", (id,))
         self.connection.commit()
 
+    def clearHistory(self, id):
+        self.c.execute("DELETE FROM search_history WHERE project_id=?", (id,))
+        self.connection.commit()
+
+    def clearResource(self, id):
+        self.c.execute("DELETE FROM resources WHERE project_id=?", (id,))
+        self.connection.commit()
+
 
 #### Get data from the database
     def getUsersData(self, uname):
         data = self.c.execute('SELECT github, github_url, email, register_date, names, id, follower, company, user_location FROM users WHERE users.github=?', (uname,))
         return data
-
-    def getAutoRefresh(self, uname):
-        auto_refresh = self.c.execute('SELECT auto_refresh FROM users WHERE github=?', (uname,))
-        for i in auto_refresh:
-            auto_refresh = i[0]
-        return auto_refresh
-
     
     def getReposData(self, uname):
         data = self.c.execute('SELECT REPO_ID, repo_name, repo_url, created_date, forks, repo_status, user_id FROM repos JOIN users ON repos.user_id = users.id WHERE users.github=?', (uname, ))
@@ -334,6 +336,15 @@ class MyGPM(object):
             repo_status = i[0]
         return repo_status
 
+    def getResources(self, id):
+        data = self.c.execute("SELECT * FROM resources WHERE project_id=?", (id,))
+        return data
+
+    def getHistory(self, id):
+        data = self.c.execute("SELECT * FROM search_history WHERE project_id=?", (id,))
+        return data
+
+
 #### Login System   
     def varify(self, uname, pword):
         list = self.c.execute('SELECT id, github, pword FROM users')
@@ -343,8 +354,18 @@ class MyGPM(object):
                 
         return False
 
+    
+    def checkAccount(self, uname):
+        data = self.c.execute("SELECT ID FROM users WHERE github=?", (uname, ))
+        for i in data:
+            return True
+
+        return False
+
+
     def deleteAccount(self, uname):
         self.c.execute('DELETE FROM repos WHERE repos.user_id=(SELECT ID FROM users WHERE github=?)', (uname,))
+        self.c.execute('DELETE FROM projects WHERE projects.user_id=(SELECT ID FROM users WHERE github=?)', (uname,))
         self.c.execute('DELETE FROM users WHERE users.github = ?', (uname,))
         self.connection.commit()
     
