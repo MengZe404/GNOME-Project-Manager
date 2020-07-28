@@ -2,7 +2,7 @@ from libgpm import MyGPM # This provides all the main functionalities and databa
 import password # This provides the functionality to decrypt data from the database
 
 import threading
-from sys import argv, exit 
+from sys import exit 
 import subprocess # This provides the functionality to open other softwares
 import os
 import time
@@ -91,8 +91,6 @@ class Login(Gtk.Window): # Login Window
         uname_input = Gtk.Entry()
         uname_input.set_placeholder_text("GitHub Account")
 
-        # For testing ONLY!!!
-        uname_input.set_text(argv[1])
 
         username.pack_start(uname_label, True, True, 0)
         username.pack_start(uname_input, True, True, 0)
@@ -106,8 +104,6 @@ class Login(Gtk.Window): # Login Window
         pword_input = Gtk.Entry()
         pword_input.set_visibility(False)
         pword_input.set_placeholder_text("Password")
-        # For testing ONLY!!!
-        pword_input.set_text(argv[2])
 
         password.pack_start(pword_label, True, True, 0)
         password.pack_start(pword_input, True, True, 0)
@@ -608,14 +604,6 @@ class Home(Gtk.Box):
         hbox = Gtk.Box(spacing=3)
         hbox.pack_start(stack_switcher, False, True, 0)
 
-        guide_button = Gtk.Button()
-        guide_button.connect("clicked", self.guide)
-        guide_icon = Gio.ThemedIcon(name="dialog-question-symbolic")
-        guide_image = Gtk.Image.new_from_gicon(guide_icon, Gtk.IconSize.BUTTON)
-        guide_button.add(guide_image)
-
-        hbox.pack_start(guide_button, False, True, 5)
-
         delete = Gtk.Button(label="Delete Account")
         delete.connect("clicked", self.deleteWindow, uname)
         hbox.pack_end(delete, False, True, 5)
@@ -874,47 +862,6 @@ class Home(Gtk.Box):
             dialog.destroy()
 
 
-# Class - Guide
-# This class creates Guide window (Gtk.Window)
-class Guide(Gtk.Window):
-    def __init__(self):
-        Gtk.Window.__init__(self)
-
-        self.set_title("GNOME Project Manager - User Guide")
-        self.set_default_size(500, 500)
-        self.set_border_width(5)
-
-        notebook = Gtk.Notebook()
-        notebook.set_scrollable(True)
-        notebook_style = notebook.get_style_context()
-        notebook_style.add_class('myNotebook')
-
-        page1 = self.home()
-        page1_style = page1.get_style_context()
-        page1_style.add_class('home')
-
-        page1_label = Gtk.Label()
-        page1_label.set_markup("<b>Home</b>")
-        page1.set_halign(0)
-
-        notebook.append_page(page1, page1_label)
-
-        self.add(notebook)
-
-        self.show_all()
-
-    
-    def home(self):
-        window = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        title = Gtk.Label()
-        title.set_markup("<span size='xx-large'>Guide</span>")
-        window.pack_start(title, False, True, 15)
-
-        important = Gtk.Label()
-        important.set_markup("<a href='https://www.howtogeek.com/669755/how-to-enable-dark-mode-on-ubuntu-20.04-lts/'><span color='white' size='large'>Please set your system to <b>DARK</b> theme for best experience</span></a>")
-        window.pack_start(important, False, True, 10)
-        return window
-
 # Class - Repo
 # This class creates Repo page (Gtk.Box)
 class Repo(Gtk.Box):       
@@ -978,11 +925,11 @@ class Repo(Gtk.Box):
                 buttons = Gtk.ButtonsType.OK,
                 text = '''
                 Data refreshed!
-                Please refresh the app to load new data!
                 '''
             )
             dialog.run()
             dialog.destroy()
+            MyWindow.refreshApp(self.main, '')
             
         except:
             dialog = Gtk.MessageDialog(
@@ -1920,10 +1867,6 @@ class projectPanel(Gtk.Window):
         about_button.add(about_image)
         hb.pack_end(about_button)
 
-        refresh = Gtk.Button(label="Refresh App")
-        refresh.connect("clicked", self.refreshApp)
-        hb.pack_start(refresh)
-
         # Set the titlebar of the window to hb
         self.set_titlebar(hb)
         # Create Notebook
@@ -2011,7 +1954,6 @@ class projectPanel(Gtk.Window):
 
     def set_page(self, page):
         self.notebook.set_current_page(page)
-
 
 
 class Info(Gtk.Box):

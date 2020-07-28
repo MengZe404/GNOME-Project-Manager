@@ -33,10 +33,10 @@ except:
 
 class MyGPM(object):
     '''
-    Help on module DMS
+    Help on module libgpm
 
     Name
-        dms
+        libgpm
 
     Description
         This module provides access to SQL database (`main.db`)
@@ -48,7 +48,7 @@ class MyGPM(object):
     Global Variable
         uname - GitHub Username (unique)
 
-    Functions
+    Main Functions
         register(uname, pword, name, email, github)
             Register an user acocunt and record the data in SQL database
         
