@@ -481,6 +481,20 @@ class MyWindow(Gtk.Window): # Main app
         about_button.add(about_image)
         hb.pack_end(about_button)
 
+        refresh = Gtk.Button(label="Refresh App")
+        refresh.connect("clicked", self.refreshApp)
+        hb.pack_start(refresh)
+
+        auto_refresh = Gtk.CheckButton(label="auto refresh")
+        auto_refresh.connect("toggled", self.autoRefresh)
+        hb.pack_start(auto_refresh)
+
+        status = app.getAutoRefresh(uname)
+        if status == 1:
+            auto_refresh.set_active(True)
+        else:
+            auto_refresh.set_active(False)
+
         # Set the titlebar of the window to hb
         self.set_titlebar(hb)
         # Create Notebook
@@ -584,6 +598,14 @@ class MyWindow(Gtk.Window): # Main app
         
     def set_page(self, page):
         self.notebook.set_current_page(page)
+
+    def autoRefresh(self, checkbutton):
+        if(checkbutton.get_active()):
+            status = 1
+        else:
+            status = 0
+
+        app.updateAutoRefresh(uname, status)
 
 
 ##########################################################################
@@ -940,6 +962,10 @@ class Repo(Gtk.Box):
         self.spinner.start()
         try:
             app.refreshData(uname)
+            refresh = app.getAutoRefresh(uname)
+            if refresh == 1:
+                self.spinner.stop()
+                MyWindow.refreshApp(self.main, '')
             dialog = Gtk.MessageDialog(
                 parent = MyWindow(),
                 flags = 0,
@@ -947,11 +973,11 @@ class Repo(Gtk.Box):
                 buttons = Gtk.ButtonsType.OK,
                 text = '''
                 Data refreshed!
+                Please refresh the app to load new data!
                 '''
             )
             dialog.run()
             dialog.destroy()
-            MyWindow.refreshApp(self.main, '')
             
         except:
             dialog = Gtk.MessageDialog(
@@ -1073,8 +1099,11 @@ class Repo(Gtk.Box):
             app.toggleRepo(0, id, uname)
         else:
             app.toggleRepo(1, id, uname)
-            
-        MyWindow.refreshApp(self.main, '')
+
+        refresh = app.getAutoRefresh(uname) 
+        if refresh == 1:
+            MyWindow.refreshApp(self.main, '')
+            return 1
 
 
 # Class - Working
@@ -1360,6 +1389,9 @@ class Working(Gtk.Box):
 
         app.insertProjectDB(uname, name, language, type, audience, feature, detail, url[0])
 
+        if refresh == 1:
+            MyWindow.refreshApp(self.main, '')
+            return 1
 
         dialog = Gtk.MessageDialog(
             parent = MyWindow(),
@@ -1368,12 +1400,13 @@ class Working(Gtk.Box):
             buttons=Gtk.ButtonsType.OK,
             text='''
             Project added!
+            Please refresh the app!
             '''
         )
 
         dialog.run()
         dialog.destroy()
-        MyWindow.refreshApp(self.main, '')
+
 
     
     def projectDone(self, button, id):
@@ -1423,6 +1456,11 @@ class Working(Gtk.Box):
         app.toggleProject(1, id, uname)
         self.close('', window)
 
+        refresh = app.getAutoRefresh(uname)
+        if refresh == 1:
+            MyWindow.refreshApp(self.main, '')
+            return 1
+
         dialog = Gtk.MessageDialog(
             parent = MyWindow(),
             flags=0,
@@ -1430,11 +1468,11 @@ class Working(Gtk.Box):
             buttons=Gtk.ButtonsType.OK,
             text='''
             Project Deleted!
+            Please refresh the app!
             '''
         )
         dialog.run()
         dialog.destroy()
-        MyWindow.refreshApp(self.main, '')
 
     def close(self, button, window):
         window.destroy()
@@ -1741,7 +1779,22 @@ class IdeaPage(Gtk.Box):
     def deleteIdea(self, button):
         id = self.data[0]
         app.deleteIdea(id)
-        MyWindow.refreshApp(self.main, '', 2)
+        refresh = app.getAutoRefresh(uname)
+        if refresh == 1:
+            MyWindow.refreshApp(self.main, '', 2)
+            return 1
+        dialog = Gtk.MessageDialog(
+            parent = MyWindow(),
+            flags= 0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text = '''
+            Idea deleted!
+            Please refresh the app to load new data!
+            ''',
+        )
+        dialog.run()
+        dialog.destroy()
     
     def startProject(self, button, uname):
         app.insertProjectDB(uname, password.decrypt(8, self.data[1]), self.data[2], self.data[3], self.data[4], password.decrypt(8, self.data[5]), password.decrypt(8, self.data[6]))
@@ -1854,8 +1907,22 @@ class IdeaPage(Gtk.Box):
             return 0
 
         app.updateIdeaData(id, name, language, type, audience, feature, detail)
-        MyWindow.refreshApp(self.main, '')
-            
+        if refresh == 1:
+            MyWindow.refreshApp(self.main, '')
+            return 1
+
+        dialog = Gtk.MessageDialog(
+                parent = MyWindow(),
+                flags= 0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.CANCEL,
+                text = '''
+                Data refreshed!
+                Please refresh the app!
+                '''
+            )
+        dialog.run()
+        dialog.destroy()
     
 ##########################################################################
 
@@ -2035,6 +2102,7 @@ class Info(Gtk.Box):
 
     # Function: create ListBox and ListBoxRows with given data
     def makeInfo(self, item, content):
+        window = Gtk.ScrolledWindow()
         # Create listbox
         listbox = Gtk.ListBox()
         listbox.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -2053,7 +2121,8 @@ class Info(Gtk.Box):
             hbox.pack_start(content_label, False, True, 10)
             # Add the row to listbox
             listbox.add(row)
-        return listbox
+        window.add(listbox)
+        return window
     
     def editProject(self):
         # Create form
@@ -2193,18 +2262,23 @@ class Info(Gtk.Box):
         app.updateProjectData(self.id, name, language, type, audience, feature, detail, path[0])
 
         try:
+            refresh = app.getAutoRefresh(uname)
+            if refresh == 1:
+                projectPanel.refreshApp(self.main, '')
+                return 1
+
             dialog = Gtk.MessageDialog(
                 parent = self.main,
                 flags= 0,
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.OK,
                 text = '''
-                Project data updated!
+                Updated!
+                Please refresh the app to load new data!
                 ''',
             )
             dialog.run()
             dialog.destroy()
-            projectPanel.refreshApp(self.main, '')
             
         except:
             dialog = Gtk.MessageDialog(

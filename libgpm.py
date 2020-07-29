@@ -242,6 +242,16 @@ class MyGPM(object):
         self.c.execute(update, data)
         self.connection.commit()
 
+    def updateAutoRefresh(self, uname, status):
+        update = '''
+            UPDATE users 
+            SET auto_refresh=?
+            WHERE github=?
+        '''
+        info = (status, uname)
+        self.c.execute(update, info)
+        self.connection.commit()
+
 
     def updateIdeaData(self, id, name, language, type, audience, feature, detail):
         update = '''
@@ -292,6 +302,12 @@ class MyGPM(object):
     def getUsersData(self, uname):
         data = self.c.execute('SELECT github, github_url, email, register_date, names, id, follower, company, user_location FROM users WHERE users.github=?', (uname,))
         return data
+
+    def getAutoRefresh(self, uname):
+        auto_refresh = self.c.execute('SELECT auto_refresh FROM users WHERE github=?', (uname,))
+        for i in auto_refresh:
+            auto_refresh = i[0]
+        return auto_refresh
     
     def getReposData(self, uname):
         data = self.c.execute('SELECT REPO_ID, repo_name, repo_url, created_date, forks, repo_status, user_id FROM repos JOIN users ON repos.user_id = users.id WHERE users.github=?', (uname, ))

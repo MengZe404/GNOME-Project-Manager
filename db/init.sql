@@ -9,6 +9,7 @@ CREATE TABLE users (
     company VARCHAR(255),
     user_location VARCHAR(255),
     follower INT,
+    auto_refresh INT,
     PRIMARY KEY (ID)
 );
 
