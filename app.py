@@ -1389,6 +1389,7 @@ class Working(Gtk.Box):
 
         app.insertProjectDB(uname, name, language, type, audience, feature, detail, url[0])
 
+        refresh = app.getAutoRefresh(uname)
         if refresh == 1:
             MyWindow.refreshApp(self.main, '')
             return 1
